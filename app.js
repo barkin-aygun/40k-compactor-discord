@@ -8,8 +8,7 @@ import {
   MessageComponentTypes,
   verifyKeyMiddleware,
 } from 'discord-interactions';
-import { getRandomEmoji, DiscordRequest } from './utils.js';
-import { getShuffledOptions, getResult } from './game.js';
+import { generateDiscordText } from './lib/generateDiscordText.js'
 
 // Create an express app
 const app = express();
@@ -56,14 +55,53 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
           ]
         },
       });
+    } else if (name === '40k') {
+      console.log("received");
+      return res.send({
+        "type": 9,
+        "data": {
+          "custom_id": "40k_list",
+          "title": "40K List Compactor",
+          "components": [
+            {
+              "type": 18,
+              "label": "Your List",
+              "description": "Copy paste from GW App or WTC-Compact",
+              "component": {
+                "type": 4,
+                "custom_id": "40k_list_input",
+                "style": 2,
+                "min_length": 100,
+                "max_length": 4000,
+                "placeholder": "Paste your list here (GW App or WTC-Compact)",
+                "required": true
+              }
+            }
+          ]
+        }
+      }
+      );
     }
 
     console.error(`unknown command: ${name}`);
     return res.status(400).json({ error: 'unknown command' });
+  } else if (type === InteractionType.MODAL_SUBMIT) {
+    const { custom_id, components } = data;
+    if (custom_id === '40k_list') {
+      const { value } = components[0].component;
+      const output = generateDiscordText(value, {
+        hideSubunits: true,
+        colorMode: 'faction',
+      });
+      console.log(output);
+      return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          content: output,
+        },
+      });
+    }
   }
-
-  console.error('unknown interaction type', type);
-  return res.status(400).json({ error: 'unknown interaction type' });
 });
 
 app.listen(PORT, () => {
