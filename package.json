@@ -1,8 +1,8 @@
 {
-  "name": "discord-getting-started",
+  "name": "40k-compactor-discord",
   "private": true,
   "version": "1.0.0",
-  "description": "Discord example app",
+  "description": "Discord app for compacting Warhammer 40,000 army lists",
   "main": "app.js",
   "type": "module",
   "engines": {
@@ -13,7 +13,7 @@
     "register": "node commands.js",
     "dev": "nodemon app.js"
   },
-  "author": "Shay DeWael",
+  "authors": ["https://github.com/desjani", "https://github.com/barkin-aygun"],
   "license": "MIT",
   "dependencies": {
     "discord-interactions": "^4.0.0",

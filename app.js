@@ -8,7 +8,7 @@ import {
   MessageComponentTypes,
   verifyKeyMiddleware,
 } from 'discord-interactions';
-import { generateDiscordText } from './lib/generateDiscordText.js'
+import { generateDiscordText } from './40kCompactor/index.js'
 
 // Create an express app
 const app = express();

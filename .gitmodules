@@ -1,0 +1,3 @@
+[submodule "40kCompactor"]
+	path = 40kCompactor
+	url = git@github.com:desjani/40kCompactor.git
