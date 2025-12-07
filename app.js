@@ -8,7 +8,24 @@ import {
   MessageComponentTypes,
   verifyKeyMiddleware,
 } from 'discord-interactions';
-import { generateDiscordText } from './40kCompactor/index.js'
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { 
+  generateDiscordText, 
+  detectFormat, 
+  parseGwApp, 
+  parseWtcCompact, 
+  parseWtc, 
+  parseNrGw, 
+  parseNrNr, 
+  parseLf,
+  buildAbbreviationIndex
+} from './40kCompactor/index.js'
+import modalJSON from './modal.js'
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Create an express app
 const app = express();
@@ -24,7 +41,7 @@ const activeGames = {};
 app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async function (req, res) {
   // Interaction id, type and data
   const { id, type, data } = req.body;
-
+  console.log(id, type)
   /**
    * Handle verification requests
    */
@@ -56,53 +73,122 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
         },
       });
     } else if (name === '40k') {
-      console.log("received");
-      return res.send({
-        "type": 9,
-        "data": {
-          "custom_id": "40k_list",
-          "title": "40K List Compactor",
-          "components": [
-            {
-              "type": 18,
-              "label": "Your List",
-              "description": "Copy paste from GW App or WTC-Compact",
-              "component": {
-                "type": 4,
-                "custom_id": "40k_list_input",
-                "style": 2,
-                "min_length": 100,
-                "max_length": 4000,
-                "placeholder": "Paste your list here (GW App or WTC-Compact)",
-                "required": true
-              }
+      try {
+        return res.send({
+          "type": 9,
+          "data": modalJSON
+        });
+      } catch (error) {
+        console.error(`error: ${error}`);
+        return res.status(500).json({ error: 'error' });
+      }
+    }
+  } else if (type === InteractionType.MODAL_SUBMIT) {
+      const { custom_id, components } = data;
+       if (custom_id === '40k_list') {
+        const style = components[1].component.values[0]
+        const { value } = components[2].component;
+        try {
+          // Load skippable_wargear.json
+          let skippableWargearMap = {};
+          try {
+            const configPath = path.join(__dirname, '40kCompactor', 'skippable_wargear.json');
+            if (fs.existsSync(configPath)) {
+              const content = fs.readFileSync(configPath, 'utf8');
+              skippableWargearMap = JSON.parse(content);
             }
-          ]
+          } catch (e) {
+            console.warn('Warning: Failed to load skippable_wargear.json', e.message);
+          }
+
+          // Split input into lines and detect format
+          const lines = value.split(/\r?\n/);
+          const format = detectFormat(lines);
+
+          // Select the appropriate parser based on format
+          const parser = {
+            GW_APP: parseGwApp,
+            WTC: parseWtc,
+            WTC_COMPACT: parseWtcCompact,
+            NR_GW: parseNrGw,
+            NRNR: parseNrNr,
+            LF: parseLf
+          }[format];
+
+          if (!parser) {
+            return res.send({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: {
+                content: `Error: Unsupported list format detected: ${format}`,
+              },
+            });
+          }
+
+          // Parse the list
+          let parsedData;
+          try {
+            parsedData = parser(lines);
+          } catch (parseError) {
+            console.error('Error parsing list:', parseError);
+            return res.send({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: {
+                content: `Error parsing list: ${parseError.message}`,
+              },
+            });
+          }
+
+          // Build abbreviation index
+          let wargearAbbrDB = { __flat_abbr: {} };
+          try {
+            wargearAbbrDB = buildAbbreviationIndex(parsedData, {});
+          } catch (e) {
+            console.warn('Warning: Failed to build abbreviation index', e);
+          }
+
+          // Generate Discord text with proper parameters
+          const renderOptions = {
+            colorMode: 'faction',
+            multilineHeader: false,
+            colors: {},
+            forcePalette: true
+          };
+
+        
+          const plain = style.includes('plain')
+          const useAbbrv = !style.includes('Extended')
+          const output = generateDiscordText(
+            parsedData,           // data
+            plain,                // plain (false = Discord format)
+            useAbbrv,                 // useAbbreviations
+            wargearAbbrDB,        // wargearAbbrMap
+            true,                 // hideSubunits
+            skippableWargearMap,  // skippableWargearMap
+            false,                // combineIdenticalUnits
+            renderOptions,        // options
+            false,                // noBullets
+            false                 // hidePoints
+          );
+
+          return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: output,
+            },
+          });
+        } catch (e) {
+          console.error(e);
+          return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `Error: ${e.message}`,
+            },
+          });
         }
       }
-      );
-    }
-
-    console.error(`unknown command: ${name}`);
-    return res.status(400).json({ error: 'unknown command' });
-  } else if (type === InteractionType.MODAL_SUBMIT) {
-    const { custom_id, components } = data;
-    if (custom_id === '40k_list') {
-      const { value } = components[0].component;
-      const output = generateDiscordText(value, {
-        hideSubunits: true,
-        colorMode: 'faction',
-      });
-      console.log(output);
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: output,
-        },
-      });
     }
   }
-});
+);
 
 app.get('/', (req, res) => {
   res.send('Hello World');
