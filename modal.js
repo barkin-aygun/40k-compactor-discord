@@ -51,7 +51,7 @@ const modalJSON = {
         "custom_id": "40k_list_input",
         "style": 2,
         "min_length": 100,
-        "max_length": 10000,
+        "max_length": 4000,
         "placeholder": "Paste your list here (GW App or WTC-Compact)",
         "required": true
       }
