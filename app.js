@@ -21,7 +21,7 @@ import {
   parseNrNr, 
   parseLf,
   buildAbbreviationIndex
-} from './40kCompactor/index.js'
+} from '40k-compactor/index.js'
 import modalJSON from './modal.js'
 
 const __filename = fileURLToPath(import.meta.url);
